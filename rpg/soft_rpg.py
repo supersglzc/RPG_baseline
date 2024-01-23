@@ -134,7 +134,12 @@ class Trainer(Configurable, RLAlgo):
         if env is None:
             from tools.config import CN
             from .env_base import make
-            env = make(env_name, **CN(env_cfg))
+            import gym
+            import d4rl
+            from pql.wrappers.d4rl_wrapper import D4RLRPGEnvWrapper
+            env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=env_cfg['n'])
+            env = D4RLRPGEnvWrapper(env)
+            env = make(env, env_name, **CN(env_cfg))
         self.env = env
         print('path', path)
     

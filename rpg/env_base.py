@@ -30,7 +30,7 @@ class VecEnv(ABC):
 
 
 class GymVecEnv(VecEnv):
-    def __init__(self, env_name, n, ignore_truncated_done=True, **kwargs) -> None:
+    def __init__(self, env, env_name, n, ignore_truncated_done=True, **kwargs) -> None:
         # by default, the mujoco's gym env do not have a truncated reward. 
         super().__init__()
         self.env_name = env_name
@@ -180,7 +180,8 @@ class GymVecEnv(VecEnv):
             return gym.make(env_name)
 
         self.nenv = n
-        self.vec_env = SubprocVectorEnv([make_env for i in range(n)])
+        # self.vec_env = SubprocVectorEnv([make_env for i in range(n)])
+        self.vec_env = env
 
         self._reset = False
         self.obs = None
@@ -192,6 +193,7 @@ class GymVecEnv(VecEnv):
         self.action_space = self.vec_env.action_space[0]
 
         self.max_time_steps = self.vec_env._max_episode_steps[0]
+        print(self.vec_env.observation_space, self.vec_env.action_space, self.vec_env._max_episode_steps)
 
     @property
     def anchor_state(self):
@@ -241,8 +243,8 @@ class GymVecEnv(VecEnv):
                 if 'success' in info[j]:
                     episode[-1]['success'] = info[j]['success']
 
-            for idx, k in zip(end_envs, self.vec_env.reset(end_envs, **self.kwargs)):
-                obs[idx] = k
+            #for idx, k in zip(end_envs, self.vec_env.reset(end_envs, **self.kwargs)):
+            #    obs[idx] = k
         self.obs = obs.copy()
 
         return {
@@ -411,8 +413,8 @@ class TorchEnv(VecEnv):
         return self.goal_env._render_traj_rgb(traj=traj, **kwargs)
 
         
-def make(env_name, n, **kwargs):
+def make(env, env_name, n, **kwargs):
     if env_name in ['LargeMaze', 'SmallMaze', 'MediumMaze', 'TripleMove', 'TreeMaze', 'MediumMazeR', 'SmallMaze2', 'GapMaze']:
         return TorchEnv(env_name, n, **kwargs)
     else:
-        return GymVecEnv(env_name, n, **kwargs)
+        return GymVecEnv(env, env_name, n, **kwargs)
