@@ -553,7 +553,7 @@ class Trainer(Configurable, RLAlgo):
                 logger.torch_save(self, f'model{epoch_id}.pt')
                 self.env = env
             
-            if epoch_id % 10 == 0:
+            if epoch_id % 5 == 0:
                 if self.name in ['antmaze-v1', 'antmaze-v2']:
                     k = 500
                 else:
