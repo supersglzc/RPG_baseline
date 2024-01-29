@@ -183,8 +183,11 @@ class GymVecEnv(VecEnv):
             import gym
             import d4rl
             from pql.wrappers.d4rl_wrapper import D4RLRPGEnvWrapper
-            name = 'antmaze-v1'
-            return gym.make(name, reward_type='sparse', random_init=False)
+            name = env
+            if name == 'antmaze-v1':
+                return gym.make(name, reward_type='sparse', random_init=True)
+            else:
+                return gym.make(name, reward_type='sparse', random_init=False)
         self.nenv = n
         self.vec_env = SubprocVectorEnv([make_env for i in range(n)])
         # self.vec_env = env

@@ -138,20 +138,20 @@ class Trainer(Configurable, RLAlgo):
         import gym
         import d4rl
         from pql.wrappers.d4rl_wrapper import D4RLRPGEnvWrapper
-        name = 'antmaze-v1'
-        env = gym.make(name, reward_type='sparse', random_init=False)
+        self.name = env_name
+        env = gym.make(self.name, reward_type='sparse', random_init=False)
         episode_len = env._max_episode_steps
         self.env_kwargs = env.env.env.spec.kwargs
         # env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=env_cfg['n'])
         # env = D4RLRPGEnvWrapper(env)
         env_cfg['n'] = 2
-        env = make(None, env_name, **CN(env_cfg))
+        env = make(self.name, env_name, **CN(env_cfg))
         # eval_env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=20)
         # eval_env = D4RLRPGEnvWrapper(eval_env)
         env_cfg['n'] = 2
-        eval_env = make(None, env_name, **CN(env_cfg))
+        eval_env = make(self.name, env_name, **CN(env_cfg))
         import wandb
-        self.wandb_run = wandb.init(project='diffusion', mode='online', name=f'RPG_v1')
+        self.wandb_run = wandb.init(project='diffusion', mode='online', name=f'RPG_{self.name}')
 
         self.env = env
         self.eval_env = eval_env
@@ -573,10 +573,14 @@ class Trainer(Configurable, RLAlgo):
             model_artifact.add_file(path)
             wandb.save(path, base_path=self.wandb_run.dir)
             self.wandb_run.log_artifact(model_artifact)
+            
+            if self.name in ['antmaze-v1', 'antmaze-v2']:
+                max_total = 3000000
+            else:
+                max_total = 4000000
 
-            if self._cfg.max_total_steps is not None: 
-                if self.total >= self._cfg.max_total_steps:
-                    break
+            if self.total >= max_total:
+                break
 
     def evaluate(self, env, steps):
         with torch.no_grad():
