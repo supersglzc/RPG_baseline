@@ -41,147 +41,153 @@ class GymVecEnv(VecEnv):
         import multiprocessing as mp
         mp.set_start_method('spawn', force=True)
 
-        def make_env():
-            from gym.wrappers import TimeLimit
-            # if env_name == 'AntPush':
-            #     from envs.ant_envs import AntHEnv
-            #     return TimeLimit(AntHEnv(env_name, **kwargs), 60)
+        # def make_env():
+        #     from gym.wrappers import TimeLimit
+        #     # if env_name == 'AntPush':
+        #     #     from envs.ant_envs import AntHEnv
+        #     #     return TimeLimit(AntHEnv(env_name, **kwargs), 60)
 
-            if env_name == 'TripleAnt':
-                from envs.triple_ant import TripleAntEnv
-                return TimeLimit(TripleAntEnv( **kwargs), 100)
+        #     if env_name == 'TripleAnt':
+        #         from envs.triple_ant import TripleAntEnv
+        #         return TimeLimit(TripleAntEnv( **kwargs), 100)
 
-            # elif env_name == 'AntMaze':
-            #     from envs.ant_maze import AntMaze
-            #     return TimeLimit(AntMaze( **kwargs), 150)
+        #     # elif env_name == 'AntMaze':
+        #     #     from envs.ant_maze import AntMaze
+        #     #     return TimeLimit(AntMaze( **kwargs), 150)
 
-            elif env_name == 'AntMaze2':
-                from envs.ant_maze import AntMaze
-                return TimeLimit(AntMaze(**kwargs, maze_id=4, init_pos=(1, 1)), 150)
-
-
-            elif env_name == 'AntMaze3':
-                from envs.ant_maze import AntCross
-                return TimeLimit(AntCross(**kwargs), 200)
-
-            elif env_name == 'AntFork':
-                from envs.ant_maze import AntFork
-                return TimeLimit(AntFork(**kwargs), 200)
-
-            elif env_name == 'BlockPush':
-                import os
-                os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-                from envs.block import BlockEnv
-                return TimeLimit(BlockEnv(**kwargs), 100)
-
-            elif env_name == 'BlockPush2':
-                import os
-                os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-                from envs.block import BlockEnv
-                return TimeLimit(BlockEnv(**kwargs, n_block=2), 60)
+        #     elif env_name == 'AntMaze2':
+        #         from envs.ant_maze import AntMaze
+        #         return TimeLimit(AntMaze(**kwargs, maze_id=4, init_pos=(1, 1)), 150)
 
 
-            elif env_name == 'Fetch':
-                # import os
-                # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-                from envs.fetch.sequential import SequentialStack
-                return TimeLimit(SequentialStack(**kwargs), 60)
+        #     elif env_name == 'AntMaze3':
+        #         from envs.ant_maze import AntCross
+        #         return TimeLimit(AntCross(**kwargs), 200)
 
-            elif env_name == 'Cabinet':
-                from envs.maniskill_env import make
-                return TimeLimit(make(**kwargs), 60)
+        #     elif env_name == 'AntFork':
+        #         from envs.ant_maze import AntFork
+        #         return TimeLimit(AntFork(**kwargs), 200)
+
+        #     elif env_name == 'BlockPush':
+        #         import os
+        #         os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+        #         from envs.block import BlockEnv
+        #         return TimeLimit(BlockEnv(**kwargs), 100)
+
+        #     elif env_name == 'BlockPush2':
+        #         import os
+        #         os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+        #         from envs.block import BlockEnv
+        #         return TimeLimit(BlockEnv(**kwargs, n_block=2), 60)
+
+
+        #     elif env_name == 'Fetch':
+        #         # import os
+        #         # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+        #         from envs.fetch.sequential import SequentialStack
+        #         return TimeLimit(SequentialStack(**kwargs), 60)
+
+        #     elif env_name == 'Cabinet':
+        #         from envs.maniskill_env import make
+        #         return TimeLimit(make(**kwargs), 60)
             
-            elif env_name == 'FixArm':
-                from envs.maniskill.fixed_arm import FixArm
-                return TimeLimit(FixArm(**kwargs), 60)
+        #     elif env_name == 'FixArm':
+        #         from envs.maniskill.fixed_arm import FixArm
+        #         return TimeLimit(FixArm(**kwargs), 60)
  
-            elif env_name == 'CabinetDense':
-                from envs.maniskill_env import make
-                print(f"this is dense Cabinet")
-                return TimeLimit(make(obs_dim=0, reward_type="dense"), 60)
+        #     elif env_name == 'CabinetDense':
+        #         from envs.maniskill_env import make
+        #         print(f"this is dense Cabinet")
+        #         return TimeLimit(make(obs_dim=0, reward_type="dense"), 60)
 
-            elif env_name == 'EEArm':
-                from envs.maniskill.ee_arm import EEArm
-                return TimeLimit(EEArm(**kwargs), 60)
+        #     elif env_name == 'EEArm':
+        #         from envs.maniskill.ee_arm import EEArm
+        #         return TimeLimit(EEArm(**kwargs), 60)
 
-            elif env_name == 'AdroitHammer':
-                from envs.modem.adroit import make_adroit_env
-                return TimeLimit(make_adroit_env('hammer-v0', **kwargs), 125)
+        #     elif env_name == 'AdroitHammer':
+        #         from envs.modem.adroit import make_adroit_env
+        #         return TimeLimit(make_adroit_env('hammer-v0', **kwargs), 125)
 
-            elif env_name == 'AdroitDoor':
-                from envs.modem.adroit import make_adroit_env
-                return TimeLimit(make_adroit_env('door-v0', **kwargs), 100)
+        #     elif env_name == 'AdroitDoor':
+        #         from envs.modem.adroit import make_adroit_env
+        #         return TimeLimit(make_adroit_env('door-v0', **kwargs), 100)
 
-            elif env_name == 'KitchenSimple':
-                from envs.modem.kitchen import KitchenMicrowaveKettleLightSliderV0
-                return TimeLimit(KitchenMicrowaveKettleLightSliderV0(**kwargs, n_block=1), 100)
+        #     elif env_name == 'KitchenSimple':
+        #         from envs.modem.kitchen import KitchenMicrowaveKettleLightSliderV0
+        #         return TimeLimit(KitchenMicrowaveKettleLightSliderV0(**kwargs, n_block=1), 100)
 
-            elif env_name == 'Kitchen':
-                from envs.modem.kitchen import KitchenMicrowaveKettleLightSliderV0
-                return TimeLimit(KitchenMicrowaveKettleLightSliderV0(**kwargs), 250)
+        #     elif env_name == 'Kitchen':
+        #         from envs.modem.kitchen import KitchenMicrowaveKettleLightSliderV0
+        #         return TimeLimit(KitchenMicrowaveKettleLightSliderV0(**kwargs), 250)
 
-            elif env_name == 'Kitchen2':
-                from envs.modem.kitchen import KitchenV2
-                return TimeLimit(KitchenV2(**kwargs), 120)
+        #     elif env_name == 'Kitchen2':
+        #         from envs.modem.kitchen import KitchenV2
+        #         return TimeLimit(KitchenV2(**kwargs), 120)
 
-            elif env_name == 'Kitchen3':
-                from envs.modem.kitchen import KitchenV3
-                return TimeLimit(KitchenV3(**kwargs), 200)
+        #     elif env_name == 'Kitchen3':
+        #         from envs.modem.kitchen import KitchenV3
+        #         return TimeLimit(KitchenV3(**kwargs), 200)
 
-            elif env_name == 'Kitchen4':
-                from envs.modem.kitchen import KitchenV4
-                return TimeLimit(KitchenV4(**kwargs), 120)
-
-
-            elif env_name == 'MWStickPull':
-                from envs.modem.metaworld_envs import make_metaworld_env
-                return TimeLimit(make_metaworld_env('stick-pull', **kwargs), 100)
-
-            elif env_name == 'MWBasketBall':
-                from envs.modem.metaworld_envs import make_metaworld_env
-                return TimeLimit(make_metaworld_env('basketball', **kwargs), 100)
-
-            elif env_name == 'PegInsert':
-                #from envs.mani. import make_metaworld_env
-                from envs.maniskill.peg_insert import PegInsert
-                return TimeLimit(PegInsert(**kwargs), 100)
-
-            elif env_name == 'Rope':
-                from envs.softbody.plb_envs import RopeEnv
-                return TimeLimit(RopeEnv(**kwargs), 50)
-
-            elif env_name == 'AntPush':
-                from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 400)
-
-            elif env_name == 'AntPushDense':
-                from envs.ant_envs import AntHEnv
-                print(f"this is dense antpush")
-                return TimeLimit(AntHEnv('AntPush', obs_dim=0, reward_type="dense"), 400)
-
-            elif env_name == 'AntPush2':
-                from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv('AntPush', **kwargs), 200)
-
-            elif env_name == 'AntMaze':
-                from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 200)
+        #     elif env_name == 'Kitchen4':
+        #         from envs.modem.kitchen import KitchenV4
+        #         return TimeLimit(KitchenV4(**kwargs), 120)
 
 
-            elif env_name == 'AntFall':
-                from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 400)
+        #     elif env_name == 'MWStickPull':
+        #         from envs.modem.metaworld_envs import make_metaworld_env
+        #         return TimeLimit(make_metaworld_env('stick-pull', **kwargs), 100)
+
+        #     elif env_name == 'MWBasketBall':
+        #         from envs.modem.metaworld_envs import make_metaworld_env
+        #         return TimeLimit(make_metaworld_env('basketball', **kwargs), 100)
+
+        #     elif env_name == 'PegInsert':
+        #         #from envs.mani. import make_metaworld_env
+        #         from envs.maniskill.peg_insert import PegInsert
+        #         return TimeLimit(PegInsert(**kwargs), 100)
+
+        #     elif env_name == 'Rope':
+        #         from envs.softbody.plb_envs import RopeEnv
+        #         return TimeLimit(RopeEnv(**kwargs), 50)
+
+        #     elif env_name == 'AntPush':
+        #         from envs.ant_envs import AntHEnv
+        #         return TimeLimit(AntHEnv(env_name, **kwargs), 400)
+
+        #     elif env_name == 'AntPushDense':
+        #         from envs.ant_envs import AntHEnv
+        #         print(f"this is dense antpush")
+        #         return TimeLimit(AntHEnv('AntPush', obs_dim=0, reward_type="dense"), 400)
+
+        #     elif env_name == 'AntPush2':
+        #         from envs.ant_envs import AntHEnv
+        #         return TimeLimit(AntHEnv('AntPush', **kwargs), 200)
+
+        #     elif env_name == 'AntMaze':
+        #         from envs.ant_envs import AntHEnv
+        #         return TimeLimit(AntHEnv(env_name, **kwargs), 200)
 
 
-            elif env_name == 'PixelCheetah':
-                from envs.mujoco_env import make
-                return make('HalfCheetah-v3', **kwargs)
+        #     elif env_name == 'AntFall':
+        #         from envs.ant_envs import AntHEnv
+        #         return TimeLimit(AntHEnv(env_name, **kwargs), 400)
 
-            return gym.make(env_name)
 
+        #     elif env_name == 'PixelCheetah':
+        #         from envs.mujoco_env import make
+        #         return make('HalfCheetah-v3', **kwargs)
+
+        #     return gym.make(env_name)
+
+        def make_env():
+            import gym
+            import d4rl
+            from pql.wrappers.d4rl_wrapper import D4RLRPGEnvWrapper
+            name = 'antmaze-v1'
+            return gym.make(name, reward_type='sparse', random_init=False)
         self.nenv = n
-        # self.vec_env = SubprocVectorEnv([make_env for i in range(n)])
-        self.vec_env = env
+        self.vec_env = SubprocVectorEnv([make_env for i in range(n)])
+        # self.vec_env = env
 
         self._reset = False
         self.obs = None
@@ -193,7 +199,7 @@ class GymVecEnv(VecEnv):
         self.action_space = self.vec_env.action_space[0]
 
         self.max_time_steps = self.vec_env._max_episode_steps[0]
-        print(self.vec_env.observation_space, self.vec_env.action_space, self.vec_env._max_episode_steps)
+        # print(self.vec_env.observation_space, self.vec_env.action_space, self.vec_env._max_episode_steps)
 
     @property
     def anchor_state(self):

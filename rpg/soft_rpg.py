@@ -20,6 +20,8 @@ from .hidden import HiddenSpace, Categorical
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
 from . import repr 
 import re
+import wandb
+
 
 def scheduler(step, schedule):
     if schedule is None:
@@ -131,18 +133,30 @@ class Trainer(Configurable, RLAlgo):
             from tools.utils import set_seed
             set_seed(seed)
 
-        if env is None:
-            from tools.config import CN
-            from .env_base import make
-            import gym
-            import d4rl
-            from pql.wrappers.d4rl_wrapper import D4RLRPGEnvWrapper
-            env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=env_cfg['n'])
-            env = D4RLRPGEnvWrapper(env)
-            env = make(env, env_name, **CN(env_cfg))
+        from tools.config import CN
+        from .env_base import make
+        import gym
+        import d4rl
+        from pql.wrappers.d4rl_wrapper import D4RLRPGEnvWrapper
+        name = 'antmaze-v1'
+        env = gym.make(name, reward_type='sparse', random_init=False)
+        episode_len = env._max_episode_steps
+        self.env_kwargs = env.env.env.spec.kwargs
+        # env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=env_cfg['n'])
+        # env = D4RLRPGEnvWrapper(env)
+        env_cfg['n'] = 2
+        env = make(None, env_name, **CN(env_cfg))
+        # eval_env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=20)
+        # eval_env = D4RLRPGEnvWrapper(eval_env)
+        env_cfg['n'] = 2
+        eval_env = make(None, env_name, **CN(env_cfg))
+        import wandb
+        self.wandb_run = wandb.init(project='diffusion', mode='online', name=f'RPG_v1')
+
         self.env = env
-        print('path', path)
-    
+        self.eval_env = eval_env
+        from pql.utils.common import DensityTracker
+        self.pos_history_exp = DensityTracker(self.env_kwargs, resolution=int(len(self.env_kwargs['maze_map']) * 51))
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
 
@@ -207,7 +221,7 @@ class Trainer(Configurable, RLAlgo):
         # print(f"{self.pi_a=}")
         # print(f"{self.pi_z=}")
         self.make_rnd()
-        self.model_learner = DynamicsLearner(self.dynamics_net, auxilary, self.pi_a, self.pi_z, cfg=trainer)
+        self.model_learner = DynamicsLearner(self.dynamics_net, auxilary, self.pi_a, self.pi_z, cfg=trainer, env=self.env_kwargs)
 
         self.intrinsic_reward = IntrinsicMotivation(*self.intrinsics)
         self.model_learner.set_intrinsic(self.intrinsic_reward)
@@ -431,7 +445,7 @@ class Trainer(Configurable, RLAlgo):
                 a, self.z = self.policy(obs, self.z, timestep)
                 prevz = totensor(self.z, device=self.device, dtype=None)
                 data, obs = self.step(self.env, a)
-
+                self.pos_history_exp.update_mat(torch.tensor(obs[:, :2]))
                 if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
                     images.append(self.env.render('rgb_array')[0])
 
@@ -525,7 +539,8 @@ class Trainer(Configurable, RLAlgo):
             logger.logkv_mean('a_min', float(a.min()))
 
             self.call_hooks(locals())
-            print(traj.summarize_epsidoe_info())
+            info = traj.summarize_epsidoe_info()
+            print(info)
 
             logger.dumpkvs()
             epoch_id += 1
@@ -539,6 +554,26 @@ class Trainer(Configurable, RLAlgo):
                 logger.torch_save(self, f'model{epoch_id}.pt')
                 self.env = env
 
+            obs = self.evaluate2(self.eval_env, 500)
+            from pql.utils.plot_util import plot_traj
+            img = plot_traj(self.env_kwargs, np.concatenate(obs, axis=0))
+            img = wandb.Image(img)
+            q_img = self.model_learner.pos_history.plot_heatmap()
+            q_img = wandb.Image(q_img)
+            exp_img = self.pos_history_exp.plot_heatmap()
+            exp_img = wandb.Image(exp_img)
+            wandb.log({'eval/map': img, 'global_steps': self.total, 'eval/return': info['rewards']}, step=self.total)
+            wandb.log({f'q_map': q_img, f'exploration_map': exp_img})
+            wandb.log({"train/state_coverage": self.pos_history_exp.get_density()})
+            path = f"{self.wandb_run.dir}/model.pth"
+            checkpoint = {'coverage': self.pos_history_exp.mat,
+                          'qvalue': self.model_learner.pos_history.mat}
+            torch.save(checkpoint, path)  # save policy network in *.pth
+            model_artifact = wandb.Artifact(self.wandb_run.id, type="model", description=f"return: {info['rewards']}")
+            model_artifact.add_file(path)
+            wandb.save(path, base_path=self.wandb_run.dir)
+            self.wandb_run.log_artifact(model_artifact)
+
             if self._cfg.max_total_steps is not None: 
                 if self.total >= self._cfg.max_total_steps:
                     break
@@ -549,3 +584,81 @@ class Trainer(Configurable, RLAlgo):
             out = self.inference(steps * self._cfg.eval_episode, mode='evaluate')
             self.start(self.env, reset=True)
             return out
+        
+    def evaluate2(self, env, steps):
+        with torch.no_grad():
+            self.start(env, reset=True)
+            out = self.inference2(env, steps * self._cfg.eval_episode, mode='evaluate')
+            self.start(env, reset=True)
+            return out
+        
+    def inference2(self, env, n_step, mode='training'):
+        obs_list = []
+        with torch.no_grad():
+            z_space = self.z_space.space
+            obs, timestep = self.start(env)
+            obs_list.append(obs[:, :2])
+            if self.z is None:
+                self.z = [z_space.sample()] * len(obs)
+            for idx in range(len(obs)):
+                if timestep[idx] == 0:
+                    self.z[idx] = z_space.sample() * 0
+        r = tqdm.trange if self._cfg.update_train_step > 0 else range 
+
+        transitions = []
+        images = []
+        for idx in r(n_step):
+            with torch.no_grad():
+                self.eval()
+                transition = dict(obs = obs, timestep=timestep)
+                a, self.z = self.policy(obs, self.z, timestep)
+                prevz = totensor(self.z, device=self.device, dtype=None)
+                data, obs = self.step(env, a)
+                obs_list.append(obs[:, :2])
+
+                if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
+                    images.append(env.render('rgb_array')[0])
+
+                transition.update(**data, a=a, z=prevz)
+                if self.reward_relabel is not None:
+                    newr = self.reward_relabel(transition['obs'], transition['a'], transition['next_obs'])
+                    assert newr.shape == transition['r'].shape
+                    transition['r'] = newr
+
+                if mode != 'training' and self.exploration is not None:
+                    # for visualize the transitions ..
+                    transition['next_state'] = self.dynamics_net.enc_s(totensor(obs, device='cuda:0'))
+
+                    if self.exploration is not None:
+                        self.exploration.visualize_transition(transition)
+
+                transitions.append(transition)
+                timestep = transition['next_timestep']
+                for j in range(len(obs)):
+                    if timestep[j] == 0:
+                        self.z[j] = z_space.sample() * 0
+
+            if mode == 'training' and self.exploration is not None:
+                self.exploration.add_data(obs, prevz)
+
+            if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
+                if idx % self._cfg.update_train_step == 0:
+                    self.update()
+
+        if len(images) > 0:
+            logger.animate(images, 'eval.mp4')
+
+
+        traj =Trajectory(transitions, len(obs), n_step)
+        if mode != 'training':
+            # if hasattr(self._cfg, 'save_eval_results') and self._cfg.save_eval_results:
+            #os.makedirs(self._cfg.save_eval_results, exist_ok=True)
+            import os
+            path = logger.dir_path(f"eval{self.epoch_id}")
+            os.makedirs(path, exist_ok=True)
+            # if len(images) == 0:
+            #     from IPython import embed; embed()
+            assert len(images) > 0
+            logger.animate(images, f'eval{self.epoch_id}/video.mp4')
+            torch.save(traj, os.path.join(path, 'traj.pt'))
+        return obs_list

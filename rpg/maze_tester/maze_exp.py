@@ -18,7 +18,7 @@ base_config = dict(
     max_epoch=2000, # 200 * 5 * 2000
     steps_per_epoch=200,
     env_name='SmallMaze',
-    env_cfg=dict(n=5, ignore_truncated_done=True),
+    env_cfg=dict(n=256, ignore_truncated_done=True),
     reward_scale=0.,
     buffer=dict(max_episode_num=100000),
     #z_dim=6,

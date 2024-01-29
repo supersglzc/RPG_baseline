@@ -305,6 +305,7 @@ class DynamicsLearner(LossOptimizer):
         pi_a, pi_z,
         
         cfg=None,
+        env=None,
         target_horizon=None, have_done=False,
         weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
 
@@ -328,6 +329,8 @@ class DynamicsLearner(LossOptimizer):
         with torch.no_grad():
             import copy
             self.target_net = copy.deepcopy(self.nets)
+        from pql.utils.common import DensityTracker
+        self.pos_history = DensityTracker(env, resolution=int(len(env['maze_map']) * 51), type='qvalue')
 
     def set_intrinsic(self, var):
         self.intrinsic_reward = var
@@ -364,6 +367,8 @@ class DynamicsLearner(LossOptimizer):
                 q_value=qnet.compute_target(vtarg, reward, done_gt.float(), self.nets.gamma),
                 state=samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
             )
+            qqq = qnet.compute_target(vtarg, reward, done_gt.float(), self.nets.gamma)
+            self.pos_history.update_mat(next_obs[:, :2].cpu(), value=qqq.reshape(-1).cpu())
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean_std('reward_step_mean', reward)
 
