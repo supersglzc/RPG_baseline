@@ -553,12 +553,12 @@ class Trainer(Configurable, RLAlgo):
                 logger.torch_save(self, f'model{epoch_id}.pt')
                 self.env = env
             
-            if epoch_id % 5 == 0:
+            if epoch_id % 40 == 0:
                 if self.name in ['antmaze-v1', 'antmaze-v2']:
                     k = 500
                 else:
                     k = 700
-                obs = self.evaluate2(self.eval_env, k)
+                obs, ep_r = self.evaluate2(self.eval_env, k)
                 from pql.utils.plot_util import plot_traj
                 img = plot_traj(self.env_kwargs, np.concatenate(obs, axis=0))
                 img = wandb.Image(img)
@@ -566,20 +566,22 @@ class Trainer(Configurable, RLAlgo):
                 q_img = wandb.Image(q_img)
                 exp_img = self.pos_history_exp.plot_heatmap()
                 exp_img = wandb.Image(exp_img)
-                wandb.log({'eval/map': img, 'global_steps': self.total, 'eval/return': info['rewards']}, step=self.total)
+                wandb.log({'eval/map': img, 'global_steps': self.total, 'eval/return': ep_r}, step=self.total)
                 wandb.log({f'q_map': q_img, f'exploration_map': exp_img})
                 wandb.log({"train/state_coverage": self.pos_history_exp.get_density()})
                 path = f"{self.wandb_run.dir}/model.pth"
                 checkpoint = {'coverage': self.pos_history_exp.mat,
                           'qvalue': self.model_learner.pos_history.mat}
                 torch.save(checkpoint, path)  # save policy network in *.pth
-                model_artifact = wandb.Artifact(self.wandb_run.id, type="model", description=f"return: {info['rewards']}")
+                model_artifact = wandb.Artifact(self.wandb_run.id, type="model", description=f"return: {ep_r}")
                 model_artifact.add_file(path)
                 wandb.save(path, base_path=self.wandb_run.dir)
                 self.wandb_run.log_artifact(model_artifact)
             
             if self.name in ['antmaze-v1', 'antmaze-v2']:
                 max_total = 3000000
+            elif self.name in ['antmaze-v4']:
+                max_total = 5000000
             else:
                 max_total = 4000000
 
@@ -615,6 +617,8 @@ class Trainer(Configurable, RLAlgo):
 
         transitions = []
         images = []
+        current_returns = np.zeros(5)
+        returns = []
         for idx in r(n_step):
             with torch.no_grad():
                 self.eval()
@@ -622,6 +626,11 @@ class Trainer(Configurable, RLAlgo):
                 a, self.z = self.policy(obs, self.z, timestep)
                 prevz = totensor(self.z, device=self.device, dtype=None)
                 data, obs = self.step(env, a)
+                current_returns += data['r'].reshape(-1)
+                for i in range(data['done'].shape[0]):
+                    if data['done'][i]:
+                        returns.append(current_returns[i])
+                        current_returns[i] = 0
                 obs_list.append(obs[:, :2])
 
                 if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
@@ -669,4 +678,4 @@ class Trainer(Configurable, RLAlgo):
             assert len(images) > 0
             logger.animate(images, f'eval{self.epoch_id}/video.mp4')
             torch.save(traj, os.path.join(path, 'traj.pt'))
-        return obs_list
+        return obs_list, sum(returns) / len(returns)
