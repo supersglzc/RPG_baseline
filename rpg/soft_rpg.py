@@ -144,11 +144,11 @@ class Trainer(Configurable, RLAlgo):
         self.env_kwargs = env.env.env.spec.kwargs
         # env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=env_cfg['n'])
         # env = D4RLRPGEnvWrapper(env)
-        env_cfg['n'] = 2
+        env_cfg['n'] = 5
         env = make(self.name, env_name, **CN(env_cfg))
         # eval_env = gym.vector.make('antmaze-v1', reward_type='sparse', num_envs=20)
         # eval_env = D4RLRPGEnvWrapper(eval_env)
-        env_cfg['n'] = 2
+        env_cfg['n'] = 5
         eval_env = make(self.name, env_name, **CN(env_cfg))
         import wandb
         self.wandb_run = wandb.init(project='diffusion', mode='online', name=f'RPG_{self.name}')
@@ -527,7 +527,6 @@ class Trainer(Configurable, RLAlgo):
             if max_epoch is not None and epoch_id >= max_epoch:
                 break
             self.epoch_id = epoch_id
-
             traj = self.inference(steps)
 
             if self._cfg.fix_buffer is None:
@@ -553,26 +552,31 @@ class Trainer(Configurable, RLAlgo):
                 self.env = None
                 logger.torch_save(self, f'model{epoch_id}.pt')
                 self.env = env
-
-            obs = self.evaluate2(self.eval_env, 500)
-            from pql.utils.plot_util import plot_traj
-            img = plot_traj(self.env_kwargs, np.concatenate(obs, axis=0))
-            img = wandb.Image(img)
-            q_img = self.model_learner.pos_history.plot_heatmap()
-            q_img = wandb.Image(q_img)
-            exp_img = self.pos_history_exp.plot_heatmap()
-            exp_img = wandb.Image(exp_img)
-            wandb.log({'eval/map': img, 'global_steps': self.total, 'eval/return': info['rewards']}, step=self.total)
-            wandb.log({f'q_map': q_img, f'exploration_map': exp_img})
-            wandb.log({"train/state_coverage": self.pos_history_exp.get_density()})
-            path = f"{self.wandb_run.dir}/model.pth"
-            checkpoint = {'coverage': self.pos_history_exp.mat,
+            
+            if epoch_id % 10 == 0:
+                if self.name in ['antmaze-v1', 'antmaze-v2']:
+                    k = 500
+                else:
+                    k = 700
+                obs = self.evaluate2(self.eval_env, k)
+                from pql.utils.plot_util import plot_traj
+                img = plot_traj(self.env_kwargs, np.concatenate(obs, axis=0))
+                img = wandb.Image(img)
+                q_img = self.model_learner.pos_history.plot_heatmap()
+                q_img = wandb.Image(q_img)
+                exp_img = self.pos_history_exp.plot_heatmap()
+                exp_img = wandb.Image(exp_img)
+                wandb.log({'eval/map': img, 'global_steps': self.total, 'eval/return': info['rewards']}, step=self.total)
+                wandb.log({f'q_map': q_img, f'exploration_map': exp_img})
+                wandb.log({"train/state_coverage": self.pos_history_exp.get_density()})
+                path = f"{self.wandb_run.dir}/model.pth"
+                checkpoint = {'coverage': self.pos_history_exp.mat,
                           'qvalue': self.model_learner.pos_history.mat}
-            torch.save(checkpoint, path)  # save policy network in *.pth
-            model_artifact = wandb.Artifact(self.wandb_run.id, type="model", description=f"return: {info['rewards']}")
-            model_artifact.add_file(path)
-            wandb.save(path, base_path=self.wandb_run.dir)
-            self.wandb_run.log_artifact(model_artifact)
+                torch.save(checkpoint, path)  # save policy network in *.pth
+                model_artifact = wandb.Artifact(self.wandb_run.id, type="model", description=f"return: {info['rewards']}")
+                model_artifact.add_file(path)
+                wandb.save(path, base_path=self.wandb_run.dir)
+                self.wandb_run.log_artifact(model_artifact)
             
             if self.name in ['antmaze-v1', 'antmaze-v2']:
                 max_total = 3000000

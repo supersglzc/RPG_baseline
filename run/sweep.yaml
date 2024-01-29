@@ -17,7 +17,7 @@ parameters:
       - 5
   --env_name:
     values:
-      - antmaze-v1
+      - antmaze-v3
   --exp:
     values:
       - dense
