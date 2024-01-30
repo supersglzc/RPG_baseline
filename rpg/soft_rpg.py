@@ -150,9 +150,10 @@ class Trainer(Configurable, RLAlgo):
         # eval_env = D4RLRPGEnvWrapper(eval_env)
         env_cfg['n'] = 5
         eval_env = make(self.name, env_name, **CN(env_cfg))
+        env_cfg['n'] = 5
         import wandb
         self.wandb_run = wandb.init(project='diffusion', mode='online', name=f'RPG_{self.name}')
-
+        
         self.env = env
         self.eval_env = eval_env
         from pql.utils.common import DensityTracker
@@ -539,7 +540,7 @@ class Trainer(Configurable, RLAlgo):
 
             self.call_hooks(locals())
             info = traj.summarize_epsidoe_info()
-            print(info)
+            # print(info)
 
             logger.dumpkvs()
             epoch_id += 1
@@ -553,7 +554,7 @@ class Trainer(Configurable, RLAlgo):
                 logger.torch_save(self, f'model{epoch_id}.pt')
                 self.env = env
             
-            if epoch_id % 40 == 0:
+            if epoch_id == 1 or epoch_id % 10 == 0:
                 if self.name in ['antmaze-v1', 'antmaze-v2']:
                     k = 500
                 else:
@@ -598,7 +599,7 @@ class Trainer(Configurable, RLAlgo):
     def evaluate2(self, env, steps):
         with torch.no_grad():
             self.start(env, reset=True)
-            out = self.inference2(env, steps * self._cfg.eval_episode, mode='evaluate')
+            out = self.inference2(env, steps * 4, mode='evaluate')
             self.start(env, reset=True)
             return out
         
@@ -619,7 +620,7 @@ class Trainer(Configurable, RLAlgo):
         images = []
         current_returns = np.zeros(5)
         returns = []
-        for idx in r(n_step):
+        for idx in range(n_step):
             with torch.no_grad():
                 self.eval()
                 transition = dict(obs = obs, timestep=timestep)
@@ -627,8 +628,9 @@ class Trainer(Configurable, RLAlgo):
                 prevz = totensor(self.z, device=self.device, dtype=None)
                 data, obs = self.step(env, a)
                 current_returns += data['r'].reshape(-1)
+                print(data['done'], data['truncated'])
                 for i in range(data['done'].shape[0]):
-                    if data['done'][i]:
+                    if data['done'][i] or data['truncated'][i]:
                         returns.append(current_returns[i])
                         current_returns[i] = 0
                 obs_list.append(obs[:, :2])
@@ -678,4 +680,5 @@ class Trainer(Configurable, RLAlgo):
             assert len(images) > 0
             logger.animate(images, f'eval{self.epoch_id}/video.mp4')
             torch.save(traj, os.path.join(path, 'traj.pt'))
+        print(sum(returns) / len(returns), len(returns))
         return obs_list, sum(returns) / len(returns)

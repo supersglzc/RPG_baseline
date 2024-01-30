@@ -8,6 +8,12 @@ metric:
   goal: maximize
   name: reward
 parameters:
+  --env_name:
+    values:
+      - antmaze-v3
+      - antmaze-v1
+      - antmaze-v2
+      - antmaze-v4
   --seed:
     values:
       - 1
@@ -15,9 +21,6 @@ parameters:
       - 3
       - 4
       - 5
-  --env_name:
-    values:
-      - antmaze-v3
   --exp:
     values:
       - dense
